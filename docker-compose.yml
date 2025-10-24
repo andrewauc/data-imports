@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  meltano:
+    build: .
+    container_name: meltano-nationalgas
+    env_file:
+      - .env
+    environment:
+      - MELTANO_PROJECT_ROOT=/app
+      # Override MELTANO_ENVIRONMENT from .env if needed
+      - MELTANO_ENVIRONMENT=${MELTANO_ENVIRONMENT:-dev}
+    volumes:
+      - ./output:/app/output
+      - meltano-data:/app/.meltano
+    restart: unless-stopped
+    # Use cron-like scheduler or run manually
+    command: ["run", "nationalgas-to-influxdb"]
+    
+  # Optional: InfluxDB for local testing
+  influxdb:
+    image: influxdb:2.7
+    container_name: influxdb
+    ports:
+      - "8086:8086"
+    env_file:
+      - .env
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=adminpassword
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG:-myorg}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET:-nationalgas}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN:-my-super-secret-auth-token}
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
+    profiles:
+      - local
+
+volumes:
+  meltano-data:
+  influxdb-data:
+  influxdb-config:

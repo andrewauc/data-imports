@@ -1,0 +1,4 @@
+meltano>=4.0.0,<5.0.0
+singer-sdk>=0.39.1
+influxdb-client>=1.44.0
+requests>=2.32.3

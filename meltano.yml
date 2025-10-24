@@ -1,0 +1,46 @@
+version: 1
+default_environment: dev
+project_id: 8a9c5e0f-1234-4567-890a-bcdef0123456
+
+environments:
+  - name: dev
+  - name: prod
+
+plugins:
+  extractors:
+    - name: tap-nationalgas
+      namespace: tap_nationalgas
+      pip_url: -e ./plugins/tap-nationalgas
+      executable: tap-nationalgas
+      capabilities:
+        - state
+        - catalog
+        - discover
+      settings:
+        - name: api_url
+          kind: string
+          value: https://api.nationalgas.com/operationaldata/v1/gasquality/latestdata
+        - name: start_date
+          kind: date_iso8601
+          value: "2024-01-01T00:00:00Z"
+
+  loaders:
+    - name: target-influxdb
+      namespace: target_influxdb
+      pip_url: -e ./plugins/target-influxdb
+      executable: target-influxdb
+      config:
+        influxdb_url: ${INFLUXDB_URL}
+        influxdb_token: ${INFLUXDB_TOKEN}
+        influxdb_org: ${INFLUXDB_ORG}
+        influxdb_bucket: ${INFLUXDB_BUCKET}
+
+schedules:
+  - name: nationalgas-to-influxdb
+    interval: '@every 30m'
+    job: nationalgas-to-influxdb
+
+jobs:
+  - name: nationalgas-to-influxdb
+    tasks:
+      - tap-nationalgas target-influxdb
