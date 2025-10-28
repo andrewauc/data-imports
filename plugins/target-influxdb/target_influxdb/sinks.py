@@ -1,7 +1,7 @@
 """InfluxDB target sink class."""
 
 from typing import Any, Dict, List, Optional
-from datetime import datetime, timezone
+from datetime import datetime, date, timezone
 
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -80,9 +80,11 @@ class InfluxDBSink(BatchSink):
             # Create point
             point = Point(measurement)
             
-            # Add timestamp
+            # Add timestamp - prioritize startTime for DISEBSP, then timestamp, then _sdc_extracted_at
             timestamp = None
-            if "timestamp" in record:
+            if "startTime" in record and record["startTime"] is not None:
+                timestamp = self._parse_timestamp(record["startTime"])
+            elif "timestamp" in record and record["timestamp"] is not None:
                 timestamp = self._parse_timestamp(record["timestamp"])
             elif "_sdc_extracted_at" in record:
                 timestamp = self._parse_timestamp(record["_sdc_extracted_at"])
@@ -99,8 +101,8 @@ class InfluxDBSink(BatchSink):
                 if key.startswith("_sdc_"):
                     continue
                     
-                # Skip timestamp as it's already handled
-                if key == "timestamp":
+                # Skip timestamp fields as they're already handled
+                if key in ("timestamp", "startTime"):
                     continue
                 
                 # Skip None values
@@ -113,6 +115,10 @@ class InfluxDBSink(BatchSink):
                 # Boolean values are fields
                 elif isinstance(value, bool):
                     fields[key] = value
+                # Date and datetime objects -> convert to ISO string tags
+                elif isinstance(value, (datetime, date)):
+                    # Convert datetime/date to ISO format string and store as tag
+                    tags[key] = value.isoformat()
                 # String values are tags (for indexing and filtering)
                 elif isinstance(value, str):
                     tags[key] = value

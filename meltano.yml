@@ -24,6 +24,22 @@ plugins:
           kind: date_iso8601
           value: "2024-01-01T00:00:00Z"
 
+    - name: tap-elexon
+      namespace: tap_elexon
+      pip_url: -e ./plugins/tap-elexon
+      executable: tap-elexon
+      capabilities:
+        - state
+        - catalog
+        - discover
+      settings:
+        - name: api_url
+          kind: string
+          value: https://data.elexon.co.uk/bmrs/api/v1/balancing/settlement/system-prices
+        - name: start_date
+          kind: date_iso8601
+          value: "2024-01-01T00:00:00Z"
+
   loaders:
     - name: target-influxdb
       namespace: target_influxdb
@@ -40,7 +56,15 @@ schedules:
     interval: '@every 30m'
     job: nationalgas-to-influxdb
 
+  - name: elexon-to-influxdb
+    interval: '0 3 * * *'
+    job: elexon-to-influxdb
+
 jobs:
   - name: nationalgas-to-influxdb
     tasks:
       - tap-nationalgas target-influxdb
+
+  - name: elexon-to-influxdb
+    tasks:
+      - tap-elexon target-influxdb
