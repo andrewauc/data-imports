@@ -165,26 +165,7 @@ class PhysicalStream(BaseBMStream):
     replication_key = "timeFrom"
 
     schema = th.PropertiesList(
-        th.Property("timeFrom", th.DateTimeType),
-        th.Property("timeTo", th.DateTimeType),
-        th.Property("settlementDate", th.DateType),
-        th.Property("settlementPeriod", th.IntegerType),
-        th.Property("bmUnit", th.StringType),
-        th.Property("nationalGridBmUnit", th.StringType),
-        th.Property("levelFrom", th.NumberType),
-        th.Property("levelTo", th.NumberType),
-    ).to_dict()
-
-
-class DynamicStream(BaseBMStream):
-    """Stream for Balancing Mechanism Dynamic Data."""
-
-    name = "Dynamic"
-    path = "/balancing/dynamic"
-    primary_keys = ["bmUnit", "timeFrom"]
-    replication_key = "timeFrom"
-
-    schema = th.PropertiesList(
+        th.Property("dataset", th.StringType),
         th.Property("timeFrom", th.DateTimeType),
         th.Property("timeTo", th.DateTimeType),
         th.Property("settlementDate", th.DateType),
@@ -215,18 +196,18 @@ class B1610Stream(BaseBMStream):
     ).to_dict()
 
     def get_url_params(self, context, next_page_token):
-        """Override to use settlementFrom/settlementTo for B1610."""
+        """Override to use from/to parameters for B1610."""
         from_dt = context.get("from_date")
         to_dt = context.get("to_date")
         bm_unit = context.get("bm_unit")
         
-        # B1610 uses settlement date format
+        # B1610 uses simple from/to date format
         from_str = from_dt.strftime("%Y-%m-%d")
         to_str = to_dt.strftime("%Y-%m-%d")
         
         return {
             "bmUnit": bm_unit,
-            "settlementDateFrom": from_str,
-            "settlementDateTo": to_str,
+            "from": from_str,
+            "to": to_str,
             "format": "json"
         }
