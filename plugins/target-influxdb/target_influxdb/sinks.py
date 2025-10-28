@@ -48,9 +48,10 @@ class InfluxDBSink(BatchSink):
         points = []
 
         for record in records:
-            point = self._record_to_point(record)
-            if point:
-                points.append(point)
+            # Some streams create multiple points per record
+            stream_points = self._record_to_points(record)
+            if stream_points:
+                points.extend(stream_points)
 
         if points:
             try:
@@ -64,14 +65,132 @@ class InfluxDBSink(BatchSink):
                 self.logger.error(f"Error writing to InfluxDB: {e}")
                 raise
 
-    def _record_to_point(self, record: Dict[str, Any]) -> Optional[Point]:
-        """Convert a record to an InfluxDB Point.
+    def _record_to_points(self, record: Dict[str, Any]) -> List[Point]:
+        """Convert a record to one or more InfluxDB Points.
+        
+        Different stream types require different handling:
+        - BOD: Creates 2 points (timeFrom with values, timeTo with zeros)
+        - B1610: Creates 2 points (timeFrom with value, timeTo with zero)
+        - Others: Creates 1 point
         
         Args:
             record: The record dictionary.
             
         Returns:
-            An InfluxDB Point object or None if conversion fails.
+            A list of InfluxDB Point objects.
+        """
+        stream_name = self.stream_name
+        
+        # Handle BOD stream specially
+        if stream_name == "BOD":
+            return self._bod_to_points(record)
+        # Handle B1610 stream specially
+        elif stream_name == "B1610":
+            return self._b1610_to_points(record)
+        # Default handling for other streams
+        else:
+            point = self._default_record_to_point(record)
+            return [point] if point else []
+    
+    def _bod_to_points(self, record: Dict[str, Any]) -> List[Point]:
+        """Convert BOD record to 2 points (one at timeFrom, one at timeTo with zeros).
+        
+        Tags: settlementDate, settlementPeriod, nationalGridBmUnit, bmUnit, levelFrom, levelTo, pairId
+        Fields: bidPrice_GBPMWh, offPrice_GBPMWh
+        """
+        try:
+            time_from = self._parse_timestamp(record.get("timeFrom"))
+            time_to = self._parse_timestamp(record.get("timeTo"))
+            bid = float(record.get("bid", 0))
+            offer = float(record.get("offer", 0))
+            
+            # Build tags
+            tags = {
+                "settlementDate": str(record.get("settlementDate", "")),
+                "settlementPeriod": str(record.get("settlementPeriod", "")),
+                "nationalGridBmUnit": str(record.get("nationalGridBmUnit", "")),
+                "bmUnit": str(record.get("bmUnit", "")),
+                "levelFrom": str(record.get("levelFrom", "")),
+                "levelTo": str(record.get("levelTo", "")),
+                "pairId": str(record.get("pairId", "")),
+            }
+            
+            # Point 1: at timeFrom with actual values
+            p1 = Point("BOD").time(time_from, WritePrecision.S)
+            p1.field("bidPrice_GBPMWh", bid)
+            p1.field("offPrice_GBPMWh", offer)
+            for k, v in tags.items():
+                if v:  # Only add non-empty tags
+                    p1.tag(k, v)
+            
+            # Point 2: at timeTo with zero values
+            p2 = Point("BOD").time(time_to, WritePrecision.S)
+            p2.field("bidPrice_GBPMWh", 0.0)
+            p2.field("offPrice_GBPMWh", 0.0)
+            for k, v in tags.items():
+                if v:  # Only add non-empty tags
+                    p2.tag(k, v)
+            
+            return [p1, p2]
+        except Exception as e:
+            self.logger.error(f"Error converting BOD record to points: {e}, record: {record}")
+            return []
+    
+    def _b1610_to_points(self, record: Dict[str, Any]) -> List[Point]:
+        """Convert B1610 record to 2 points (one at timeFrom, one at timeTo with zero).
+        
+        Tags: settlementDate, settlementPeriod, nationalGridBmUnit, bmUnit, psrType
+        Fields: Gen_MV_MW
+        """
+        try:
+            half_hour_end = self._parse_timestamp(record.get("halfHourEndTime"))
+            time_to = half_hour_end
+            # Calculate timeFrom as 30 minutes before timeFrom
+            from datetime import timedelta
+            time_from = time_to - timedelta(minutes=30)
+            
+            quantity = float(record.get("quantity", 0))
+            
+            # Build tags
+            tags = {
+                "settlementDate": str(record.get("settlementDate", "")),
+                "settlementPeriod": str(record.get("settlementPeriod", "")),
+                "nationalGridBmUnit": str(record.get("nationalGridBmUnitId", "")),
+                "bmUnit": str(record.get("bmUnit", "")),
+                "psrType": str(record.get("psrType", "")),
+            }
+            
+            # Point 1: at timeFrom with actual value
+            p1 = Point("B1610").time(time_from, WritePrecision.S)
+            p1.field("Gen_MV_MW", quantity)
+            for k, v in tags.items():
+                if v:  # Only add non-empty tags
+                    p1.tag(k, v)
+            
+            # Point 2: at timeTo with zero value
+            p2 = Point("B1610").time(time_to, WritePrecision.S)
+            p2.field("Gen_MV_MW", 0.0)
+            for k, v in tags.items():
+                if v:  # Only add non-empty tags
+                    p2.tag(k, v)
+            
+            return [p1, p2]
+        except Exception as e:
+            self.logger.error(f"Error converting B1610 record to points: {e}, record: {record}")
+            return []
+
+    def _default_record_to_point(self, record: Dict[str, Any]) -> Optional[Point]:
+        """Convert a record to an InfluxDB Point using default logic.
+        
+        Default behavior:
+        - Numeric values become fields
+        - Strings and dates become tags
+        
+        Args:
+            record: The record dictionary.
+            
+        Returns:
+            An InfluxDB Point object, or None if no valid timestamp.
         """
         try:
             # Use stream name as measurement
