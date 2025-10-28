@@ -76,7 +76,11 @@ class BOALFStream(RESTStream):
         
         if state_value:
             # Use state from last successful run (incremental load)
-            start_dt = state_value
+            # State value might be a string or datetime, so normalize it
+            if isinstance(state_value, str):
+                start_dt = datetime.fromisoformat(state_value.replace('Z', '+00:00'))
+            else:
+                start_dt = state_value
             self.logger.info(f"Incremental sync: starting from last bookmark {start_dt}")
         else:
             # Initial load: use start_date from config
