@@ -1,0 +1,18 @@
+[build-system]
+requires = ["poetry-core>=1.0.8"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "tap-elexon-bm"
+version = "0.1.0"
+description = "Singer tap for Elexon BM data"
+authors = ["Your Name"]
+license = "Apache-2.0"
+
+[tool.poetry.dependencies]
+python = ">=3.8"
+singer-sdk = "~=0.39.1"
+requests = "^2.31.0"
+
+[tool.poetry.scripts]
+tap-elexon-bm = "tap_elexon_bm.tap:TapElexonBM.cli"
