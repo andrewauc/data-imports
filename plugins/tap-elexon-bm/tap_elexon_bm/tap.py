@@ -3,7 +3,13 @@
 from singer_sdk import Tap, Stream
 from singer_sdk import typing as th
 
-from tap_elexon_bm.streams import BOALFStream
+from tap_elexon_bm.streams import (
+    BOALFStream,
+    BODStream,
+    PhysicalStream,
+    DynamicStream,
+    B1610Stream,
+)
 
 
 class TapElexonBM(Tap):
@@ -35,6 +41,10 @@ class TapElexonBM(Tap):
         """Return a list of discovered streams."""
         return [
             BOALFStream(self),
+            BODStream(self),
+            PhysicalStream(self),
+            DynamicStream(self),
+            B1610Stream(self),
         ]
 
 

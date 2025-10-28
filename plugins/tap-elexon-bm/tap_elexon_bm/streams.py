@@ -5,31 +5,8 @@ from singer_sdk import typing as th
 from singer_sdk.streams import RESTStream
 
 
-class BOALFStream(RESTStream):
-    """Stream for Balancing Mechanism Acceptances (BOALF) data."""
-
-    name = "BOALF"
-    path = "/balancing/acceptances"
-    primary_keys = ["bmUnit", "acceptanceNumber", "timeFrom"]
-    replication_key = "timeFrom"  # Use timeFrom for incremental syncs
-
-    schema = th.PropertiesList(
-        th.Property("timeFrom", th.DateTimeType),
-        th.Property("timeTo", th.DateTimeType),
-        th.Property("settlementDate", th.DateType),
-        th.Property("settlementPeriodFrom", th.IntegerType),
-        th.Property("settlementPeriodTo", th.IntegerType),
-        th.Property("bmUnit", th.StringType),
-        th.Property("nationalGridBmUnit", th.StringType),
-        th.Property("acceptanceNumber", th.IntegerType),
-        th.Property("acceptanceTime", th.DateTimeType),
-        th.Property("levelFrom", th.NumberType),
-        th.Property("levelTo", th.NumberType),
-        th.Property("deemedBoFlag", th.BooleanType),
-        th.Property("soFlag", th.BooleanType),
-        th.Property("storFlag", th.BooleanType),
-        th.Property("rrFlag", th.BooleanType),
-    ).to_dict()
+class BaseBMStream(RESTStream):
+    """Base class for Balancing Mechanism streams with common functionality."""
 
     @property
     def url_base(self) -> str:
@@ -76,7 +53,11 @@ class BOALFStream(RESTStream):
         
         if state_value:
             # Use state from last successful run (incremental load)
-            start_dt = state_value
+            # State value might be a string or datetime, so normalize it
+            if isinstance(state_value, str):
+                start_dt = datetime.fromisoformat(state_value.replace('Z', '+00:00'))
+            else:
+                start_dt = state_value
             self.logger.info(f"Incremental sync: starting from last bookmark {start_dt}")
         else:
             # Initial load: use start_date from config
@@ -112,7 +93,7 @@ class BOALFStream(RESTStream):
         for bm_unit in bm_units:
             for from_date, to_date in date_ranges:
                 self.logger.info(
-                    f"Fetching BOALF data for BM unit: {bm_unit}, "
+                    f"Fetching {self.name} data for BM unit: {bm_unit}, "
                     f"from {from_date.isoformat()} to {to_date.isoformat()}"
                 )
                 
@@ -124,10 +105,128 @@ class BOALFStream(RESTStream):
                 # Call parent get_records with this context
                 yield from super().get_records(context)
 
-    @staticmethod
-    def _to_float(value):
-        """Convert value to float, return None if conversion fails."""
-        try:
-            return float(value) if value is not None else None
-        except (ValueError, TypeError):
-            return None
+
+class BOALFStream(BaseBMStream):
+    """Stream for Balancing Mechanism Acceptances (BOALF) data."""
+
+    name = "BOALF"
+    path = "/balancing/acceptances"
+    primary_keys = ["bmUnit", "acceptanceNumber", "timeFrom"]
+    replication_key = "timeFrom"  # Use timeFrom for incremental syncs
+
+    schema = th.PropertiesList(
+        th.Property("timeFrom", th.DateTimeType),
+        th.Property("timeTo", th.DateTimeType),
+        th.Property("settlementDate", th.DateType),
+        th.Property("settlementPeriodFrom", th.IntegerType),
+        th.Property("settlementPeriodTo", th.IntegerType),
+        th.Property("bmUnit", th.StringType),
+        th.Property("nationalGridBmUnit", th.StringType),
+        th.Property("acceptanceNumber", th.IntegerType),
+        th.Property("acceptanceTime", th.DateTimeType),
+        th.Property("levelFrom", th.NumberType),
+        th.Property("levelTo", th.NumberType),
+        th.Property("deemedBoFlag", th.BooleanType),
+        th.Property("soFlag", th.BooleanType),
+        th.Property("storFlag", th.BooleanType),
+        th.Property("rrFlag", th.BooleanType),
+    ).to_dict()
+
+
+class BODStream(BaseBMStream):
+    """Stream for Balancing Mechanism Bid-Offer Data (BOD)."""
+
+    name = "BOD"
+    path = "/balancing/bid-offer"
+    primary_keys = ["bmUnit", "pairId", "timeFrom"]
+    replication_key = "timeFrom"
+
+    schema = th.PropertiesList(
+        th.Property("timeFrom", th.DateTimeType),
+        th.Property("timeTo", th.DateTimeType),
+        th.Property("settlementDate", th.DateType),
+        th.Property("settlementPeriod", th.IntegerType),
+        th.Property("bmUnit", th.StringType),
+        th.Property("nationalGridBmUnit", th.StringType),
+        th.Property("pairId", th.IntegerType),
+        th.Property("levelFrom", th.NumberType),
+        th.Property("levelTo", th.NumberType),
+        th.Property("bid", th.NumberType),
+        th.Property("offer", th.NumberType),
+    ).to_dict()
+
+
+class PhysicalStream(BaseBMStream):
+    """Stream for Balancing Mechanism Physical Data."""
+
+    name = "Physical"
+    path = "/balancing/physical"
+    primary_keys = ["bmUnit", "timeFrom"]
+    replication_key = "timeFrom"
+
+    schema = th.PropertiesList(
+        th.Property("timeFrom", th.DateTimeType),
+        th.Property("timeTo", th.DateTimeType),
+        th.Property("settlementDate", th.DateType),
+        th.Property("settlementPeriod", th.IntegerType),
+        th.Property("bmUnit", th.StringType),
+        th.Property("nationalGridBmUnit", th.StringType),
+        th.Property("levelFrom", th.NumberType),
+        th.Property("levelTo", th.NumberType),
+    ).to_dict()
+
+
+class DynamicStream(BaseBMStream):
+    """Stream for Balancing Mechanism Dynamic Data."""
+
+    name = "Dynamic"
+    path = "/balancing/dynamic"
+    primary_keys = ["bmUnit", "timeFrom"]
+    replication_key = "timeFrom"
+
+    schema = th.PropertiesList(
+        th.Property("timeFrom", th.DateTimeType),
+        th.Property("timeTo", th.DateTimeType),
+        th.Property("settlementDate", th.DateType),
+        th.Property("settlementPeriod", th.IntegerType),
+        th.Property("bmUnit", th.StringType),
+        th.Property("nationalGridBmUnit", th.StringType),
+        th.Property("levelFrom", th.NumberType),
+        th.Property("levelTo", th.NumberType),
+    ).to_dict()
+
+
+class B1610Stream(BaseBMStream):
+    """Stream for B1610 Actual Generation Output per BM Unit."""
+
+    name = "B1610"
+    path = "/datasets/B1610/stream"
+    primary_keys = ["bmUnit", "settlementDate", "settlementPeriod"]
+    replication_key = "halfHourEndTime"  # B1610 uses different time field
+
+    schema = th.PropertiesList(
+        th.Property("halfHourEndTime", th.DateTimeType),
+        th.Property("settlementDate", th.DateType),
+        th.Property("settlementPeriod", th.IntegerType),
+        th.Property("bmUnit", th.StringType),
+        th.Property("nationalGridBmUnitId", th.StringType),
+        th.Property("psrType", th.StringType),
+        th.Property("quantity", th.NumberType),
+    ).to_dict()
+
+    def get_url_params(self, context, next_page_token):
+        """Override to use settlementFrom/settlementTo for B1610."""
+        from_dt = context.get("from_date")
+        to_dt = context.get("to_date")
+        bm_unit = context.get("bm_unit")
+        
+        # B1610 uses settlement date format
+        from_str = from_dt.strftime("%Y-%m-%d")
+        to_str = to_dt.strftime("%Y-%m-%d")
+        
+        return {
+            "bmUnit": bm_unit,
+            "settlementDateFrom": from_str,
+            "settlementDateTo": to_str,
+            "format": "json"
+        }
