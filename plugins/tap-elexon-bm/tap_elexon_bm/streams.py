@@ -58,6 +58,11 @@ class BaseBMStream(RESTStream):
                 start_dt = datetime.fromisoformat(state_value.replace('Z', '+00:00'))
             else:
                 start_dt = state_value
+            
+            # Ensure start_dt is timezone-aware
+            if start_dt.tzinfo is None:
+                start_dt = start_dt.replace(tzinfo=timezone.utc)
+            
             self.logger.info(f"Incremental sync: starting from last bookmark {start_dt}")
         else:
             # Initial load: use start_date from config
@@ -67,14 +72,14 @@ class BaseBMStream(RESTStream):
                     start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
                 else:
                     start_dt = start_date
+                
+                # Ensure start_dt is timezone-aware
+                if start_dt.tzinfo is None:
+                    start_dt = start_dt.replace(tzinfo=timezone.utc)
             else:
                 # Default: last 7 days
                 start_dt = datetime.now(timezone.utc) - timedelta(days=7)
             self.logger.info(f"Initial sync: starting from config start_date {start_dt}")
-        
-        # Ensure start_dt is timezone-aware
-        if start_dt.tzinfo is None:
-            start_dt = start_dt.replace(tzinfo=timezone.utc)
         
         end_dt = datetime.now(timezone.utc)
         
