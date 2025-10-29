@@ -117,9 +117,10 @@ jobs:
     tasks:
       - tap-elexon target-influxdb
 
-  - name: elexon-bm-to-influxdb
-    tasks:
-      - tap-elexon-bm target-influxdb
+  # Disabled until changes are decided
+  # - name: elexon-bm-to-influxdb
+  #   tasks:
+  #     - tap-elexon-bm target-influxdb
 
   - name: elexon-midp-to-influxdb
     tasks:
