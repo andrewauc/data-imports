@@ -99,9 +99,10 @@ schedules:
     interval: '0 3 * * *'
     job: elexon-to-influxdb
 
-  - name: elexon-bm-to-influxdb
-    interval: '@every 30m'
-    job: elexon-bm-to-influxdb
+  # Disabled until changes are decided
+  # - name: elexon-bm-to-influxdb
+  #   interval: '@every 30m'
+  #   job: elexon-bm-to-influxdb
 
   - name: elexon-midp-to-influxdb
     interval: '@every 30m'
