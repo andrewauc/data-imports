@@ -6,6 +6,14 @@ environments:
   - name: dev
   - name: prod
 
+# Shared configuration
+_bm_units: &bm_units
+  - "2__DSTAT001"
+  - "2__ESTAT003"
+  - "2__ESTAT001"
+  - "2__LSTAT003"
+  - "2__HSTAT003"
+
 plugins:
   extractors:
     - name: tap-nationalgas
@@ -24,10 +32,10 @@ plugins:
           kind: date_iso8601
           value: "2024-01-01T00:00:00Z"
 
-    - name: tap-elexon
-      namespace: tap_elexon
-      pip_url: -e ./plugins/tap-elexon
-      executable: tap-elexon
+    - name: tap-elexon-disebsp
+      namespace: tap_elexon_disebsp
+      pip_url: -e ./plugins/tap-elexon-disebsp
+      executable: tap-elexon-disebsp
       capabilities:
         - state
         - catalog
@@ -54,12 +62,7 @@ plugins:
           value: https://data.elexon.co.uk/bmrs/api/v1
         - name: bm_units
           kind: array
-          value:
-            - "2__DSTAT001"
-            - "2__ESTAT003"
-            - "2__ESTAT001"
-            - "2__LSTAT003"
-            - "2__HSTAT003"
+          value: *bm_units
         - name: start_date
           kind: date_iso8601
           value: "2024-01-01T00:00:00Z"
@@ -79,6 +82,25 @@ plugins:
         - name: start_date
           kind: date_iso8601
 
+    - name: tap-elexon-b1610
+      namespace: tap_elexon_b1610
+      pip_url: -e ./plugins/tap-elexon-b1610
+      executable: tap-elexon-b1610
+      capabilities:
+        - state
+        - catalog
+        - discover
+      settings:
+        - name: api_url
+          kind: string
+          value: https://data.elexon.co.uk/bmrs/api/v1
+        - name: bm_units
+          kind: array
+          value: *bm_units
+        - name: start_date
+          kind: date_iso8601
+          value: "2024-01-01T00:00:00Z"
+
   loaders:
     - name: target-influxdb
       namespace: target_influxdb
@@ -95,9 +117,9 @@ schedules:
     interval: '@every 30m'
     job: nationalgas-to-influxdb
 
-  - name: elexon-to-influxdb
+  - name: elexon-disebsp-to-influxdb
     interval: '0 3 * * *'
-    job: elexon-to-influxdb
+    job: elexon-disebsp-to-influxdb
 
   # Disabled until changes are decided
   # - name: elexon-bm-to-influxdb
@@ -108,14 +130,18 @@ schedules:
     interval: '@every 30m'
     job: elexon-midp-to-influxdb
 
+  - name: elexon-b1610-to-influxdb
+    interval: '0 3 * * *'
+    job: elexon-b1610-to-influxdb
+
 jobs:
   - name: nationalgas-to-influxdb
     tasks:
       - tap-nationalgas target-influxdb
 
-  - name: elexon-to-influxdb
+  - name: elexon-disebsp-to-influxdb
     tasks:
-      - tap-elexon target-influxdb
+      - tap-elexon-disebsp target-influxdb
 
   # Disabled until changes are decided
   # - name: elexon-bm-to-influxdb
@@ -125,3 +151,7 @@ jobs:
   - name: elexon-midp-to-influxdb
     tasks:
       - tap-elexon-midp target-influxdb
+
+  - name: elexon-b1610-to-influxdb
+    tasks:
+      - tap-elexon-b1610 target-influxdb

@@ -70,8 +70,8 @@ class InfluxDBSink(BatchSink):
         
         Different stream types require different handling:
         - BOD: Creates 2 points (timeFrom with values, timeTo with zeros)
-        - B1610: Creates 2 points (timeFrom with value, timeTo with zero)
-        - Others: Creates 1 point
+        - B1610: Uses special tag handling (all fields except Gen_MV_MW are tags)
+        - Others: Creates 1 point using default logic
         
         Args:
             record: The record dictionary.
@@ -86,7 +86,7 @@ class InfluxDBSink(BatchSink):
             return self._bod_to_points(record)
         # Handle B1610 stream specially
         elif stream_name == "B1610":
-            return self._b1610_to_points(record)
+            return self._b1610_to_point(record)
         # Default handling for other streams
         else:
             point = self._default_record_to_point(record)
@@ -136,47 +136,63 @@ class InfluxDBSink(BatchSink):
             self.logger.error(f"Error converting BOD record to points: {e}, record: {record}")
             return []
     
-    def _b1610_to_points(self, record: Dict[str, Any]) -> List[Point]:
-        """Convert B1610 record to 2 points (one at timeFrom, one at timeTo with zero).
+    def _b1610_to_point(self, record: Dict[str, Any]) -> List[Point]:
+        """Convert B1610 record to a single point.
         
-        Tags: settlementDate, settlementPeriod, nationalGridBmUnit, bmUnit, psrType
-        Fields: Gen_MV_MW
+        All fields are tags except:
+        - halfHourEndTime: used as timestamp
+        - quantity: renamed to Gen_MV_MW as the only field (measurement value)
+        
+        Args:
+            record: The record dictionary.
+            
+        Returns:
+            A list containing a single InfluxDB Point.
         """
         try:
-            half_hour_end = self._parse_timestamp(record.get("halfHourEndTime"))
-            time_to = half_hour_end
-            # Calculate timeFrom as 30 minutes before timeFrom
-            from datetime import timedelta
-            time_from = time_to - timedelta(minutes=30)
+            # Get timestamp from halfHourEndTime
+            timestamp = self._parse_timestamp(record.get("halfHourEndTime"))
             
-            quantity = float(record.get("quantity", 0))
+            # Get the measurement field - check both names  
+            gen_mw = record.get("Gen_MV_MW")
+            if gen_mw is None:
+                gen_mw = record.get("quantity")
             
-            # Build tags
-            tags = {
-                "settlementDate": str(record.get("settlementDate", "")),
-                "settlementPeriod": str(record.get("settlementPeriod", "")),
-                "nationalGridBmUnit": str(record.get("nationalGridBmUnitId", "")),
-                "bmUnit": str(record.get("bmUnit", "")),
-                "psrType": str(record.get("psrType", "")),
-            }
+            # If still no value, skip this record (API returns some records without quantity)
+            if gen_mw is None:
+                # Don't log as error - API legitimately returns records without quantity sometimes
+                return []
             
-            # Point 1: at timeFrom with actual value
-            p1 = Point("B1610").time(time_from, WritePrecision.S)
-            p1.field("Gen_MV_MW", quantity)
-            for k, v in tags.items():
-                if v:  # Only add non-empty tags
-                    p1.tag(k, v)
+            # Create point
+            point = Point("B1610").time(timestamp, WritePrecision.S)
             
-            # Point 2: at timeTo with zero value
-            p2 = Point("B1610").time(time_to, WritePrecision.S)
-            p2.field("Gen_MV_MW", 0.0)
-            for k, v in tags.items():
-                if v:  # Only add non-empty tags
-                    p2.tag(k, v)
+            # Add the single field with the correct name
+            point.field("Gen_MV_MW", float(gen_mw))
             
-            return [p1, p2]
+            # All other fields become tags
+            for key, value in record.items():
+                # Skip metadata fields
+                if key.startswith("_sdc_"):
+                    continue
+                # Skip the timestamp field (already used)
+                if key == "halfHourEndTime":
+                    continue
+                # Skip the measurement fields (already added)
+                if key in ("Gen_MV_MW", "quantity"):
+                    continue
+                # Skip None values
+                if value is None:
+                    continue
+                
+                # Convert all other fields to string tags
+                if isinstance(value, (datetime, date)):
+                    point.tag(key, value.isoformat())
+                else:
+                    point.tag(key, str(value))
+            
+            return [point]
         except Exception as e:
-            self.logger.error(f"Error converting B1610 record to points: {e}, record: {record}")
+            self.logger.error(f"Error converting B1610 record to point: {e}, record: {record}")
             return []
 
     def _default_record_to_point(self, record: Dict[str, Any]) -> Optional[Point]:
@@ -199,10 +215,12 @@ class InfluxDBSink(BatchSink):
             # Create point
             point = Point(measurement)
             
-            # Add timestamp - prioritize startTime for DISEBSP, then timestamp, then _sdc_extracted_at
+            # Add timestamp - prioritize startTime for DISEBSP, halfHourEndTime for B1610, then timestamp, then _sdc_extracted_at
             timestamp = None
             if "startTime" in record and record["startTime"] is not None:
                 timestamp = self._parse_timestamp(record["startTime"])
+            elif "halfHourEndTime" in record and record["halfHourEndTime"] is not None:
+                timestamp = self._parse_timestamp(record["halfHourEndTime"])
             elif "timestamp" in record and record["timestamp"] is not None:
                 timestamp = self._parse_timestamp(record["timestamp"])
             elif "_sdc_extracted_at" in record:
@@ -221,7 +239,7 @@ class InfluxDBSink(BatchSink):
                     continue
                     
                 # Skip timestamp fields as they're already handled
-                if key in ("timestamp", "startTime"):
+                if key in ("timestamp", "startTime", "halfHourEndTime"):
                     continue
                 
                 # Skip None values

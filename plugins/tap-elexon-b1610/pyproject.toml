@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "tap-elexon-b1610"
+version = "0.1.0"
+description = "Singer tap for B1610 Actual Generation Output data from Elexon"
+authors = ["Your Name <your.email@example.com>"]
+readme = "README.md"
+packages = [{include = "tap_elexon_b1610"}]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+singer-sdk = "^0.39.0"
+requests = "^2.31.0"
+
+[tool.poetry.scripts]
+tap-elexon-b1610 = 'tap_elexon_b1610.tap:TapElexonB1610.cli'
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

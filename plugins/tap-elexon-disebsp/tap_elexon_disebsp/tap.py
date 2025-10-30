@@ -1,17 +1,17 @@
-"""Elexon BMRS tap class."""
+"""Elexon DISEBSP tap class."""
 
 from typing import List
 
 from singer_sdk import Tap, Stream
 from singer_sdk import typing as th
 
-from tap_elexon.streams import SystemPricesStream
+from tap_elexon_disebsp.streams import SystemPricesStream
 
 
-class TapElexon(Tap):
-    """Elexon BMRS tap class."""
+class TapElexonDISEBSP(Tap):
+    """Elexon DISEBSP tap class."""
 
-    name = "tap-elexon"
+    name = "tap-elexon-disebsp"
 
     config_jsonschema = th.PropertiesList(
         th.Property(
@@ -36,4 +36,4 @@ class TapElexon(Tap):
 
 
 if __name__ == "__main__":
-    TapElexon.cli()
+    TapElexonDISEBSP.cli()

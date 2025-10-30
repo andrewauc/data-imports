@@ -3,12 +3,12 @@ requires = ["poetry-core>=1.0.8", "poetry-dynamic-versioning"]
 build-backend = "poetry_dynamic_versioning.backend"
 
 [tool.poetry]
-name = "tap-elexon"
+name = "tap-elexon-disebsp"
 version = "0.1.0"
-description = "Singer tap for Elexon BMRS API"
+description = "Singer tap for Elexon DISEBSP (System Prices) data"
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"
-keywords = ["ELT", "Elexon", "BMRS", "Singer", "Meltano"]
+keywords = ["ELT", "Elexon", "BMRS", "DISEBSP", "Singer", "Meltano"]
 
 [tool.poetry.dependencies]
 python = ">=3.8"
@@ -16,4 +16,4 @@ singer-sdk = "^0.39.1"
 requests = "^2.32.3"
 
 [tool.poetry.scripts]
-tap-elexon = "tap_elexon.tap:TapElexon.cli"
+tap-elexon-disebsp = "tap_elexon_disebsp.tap:TapElexonDISEBSP.cli"
