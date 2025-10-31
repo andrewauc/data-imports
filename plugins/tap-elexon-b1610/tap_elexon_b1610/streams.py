@@ -11,7 +11,7 @@ class B1610Stream(RESTStream):
     name = "B1610"
     path = "/datasets/B1610/stream"
     primary_keys = ["bmUnit", "settlementDate", "settlementPeriod"]
-    replication_key = "halfHourEndTime"
+    replication_key = None  # Disable state tracking - always fetch 365 days
 
     schema = th.PropertiesList(
         th.Property("dataset", th.StringType),

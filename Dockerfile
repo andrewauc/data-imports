@@ -19,18 +19,22 @@ COPY plugins/ ./plugins/
 
 # Install custom plugins
 RUN pip install -e ./plugins/tap-nationalgas
+RUN pip install -e ./plugins/tap-elexon-disebsp
+RUN pip install -e ./plugins/tap-elexon-b1610
+RUN pip install -e ./plugins/tap-elexon-midp
 RUN pip install -e ./plugins/target-influxdb
 
 # Initialize Meltano
 RUN meltano install
 
-# Create a script to run the pipeline
+# Create scripts to run the pipeline
 COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+COPY run-all-jobs.sh /run-all-jobs.sh
+RUN chmod +x /docker-entrypoint.sh /run-all-jobs.sh
 
 # Set environment
 ENV MELTANO_PROJECT_ROOT=/app
 ENV MELTANO_DATABASE_URI=sqlite:////app/.meltano/meltano.db
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["schedule", "run"]
+CMD ["run-all"]
